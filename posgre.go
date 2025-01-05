@@ -7,7 +7,7 @@ import (
 	"log"
 )
 
-func posgrebd() {
+func main() {
 	db, err := sql.Open("postgres", "postgres://userok:p@ssw0rd@localhost:5400/pogreb?sslmode=disable")
 
 	db.SetMaxOpenConns(10)
