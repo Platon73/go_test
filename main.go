@@ -2,13 +2,13 @@ package main
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 	"html/template"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -25,25 +25,40 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	users := []*User{}
 
-	rows, err := h.DB.Query("SELECT * from user")
+	rows, err := h.DB.Query("SELECT id, firstname, lastname, email, age, created from users")
 
 	__err_panic(err)
 
 	for rows.Next() {
 		post := &User{}
-		err = rows.Scan(&post.ID, &post.Firstname, &post.Lastname, &post.Email, &post.Age)
+		log.Println("Записи ", rows)
+		err = rows.Scan(&post.ID, &post.Firstname, &post.Lastname, &post.Email, &post.Age, &post.Created)
 		__err_panic(err)
 		users = append(users, post)
 	}
 
 	rows.Close()
 
-	usersJSON, err := json.Marshal(users)
-	if err != nil {
-		log.Fatalf("Ошибка при маршализации пользователей: %v", err)
+	var strRes strings.Builder
+
+	if users != nil && len(users) > 0 {
+		for _, user := range users {
+			strRes.WriteString(user.ID + " " + user.Firstname + " " + user.Lastname + " " + user.Email + " " + user.Created.Format(time.RFC3339) + "\n")
+		}
 	}
 
-	w.Write(usersJSON)
+	// Создаем структуру для передачи в шаблон
+	data := struct {
+		Data string
+	}{
+		Data: strRes.String(),
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	err1 := h.Tmpl.Execute(w, data) // Передаем данные в шаблон
+	if err1 != nil {
+		http.Error(w, "Ошибка при выполнении шаблона", http.StatusInternalServerError)
+	}
 }
 
 type Handler struct {
@@ -72,19 +87,20 @@ func main() {
 	log.Println("Успешно подключено к базе данных!")
 
 	handlers := &Handler{
-		DB:   db,
-		Tmpl: template.Must(template.ParseGlob("../user/*")),
+		DB: db,
+		Tmpl: template.Must(template.New("example").Parse("<!DOCTYPE html>" +
+			"<html><head>" +
+			"<title>List users</title>" +
+			"</head>" +
+			"<body>" +
+			"<h1>List users in JSON</h1>" +
+			"{{ .Data}}</body></html>")),
+		//Tmpl: template.Must(template.ParseGlob("../crud_templates/*")),
 	}
 
 	// в целям упрощения примера пропущена авторизация и csrf
 	r := mux.NewRouter()
-	r.HandleFunc("/", handlers.List).Methods("GET")
-	//r.HandleFunc("/items", handlers.List).Methods("GET")
-	//r.HandleFunc("/items/new", handlers.AddForm).Methods("GET")
-	//r.HandleFunc("/items/new", handlers.Add).Methods("POST")
-	//r.HandleFunc("/items/{id}", handlers.Edit).Methods("GET")
-	//r.HandleFunc("/items/{id}", handlers.Update).Methods("POST")
-	//r.HandleFunc("/items/{id}", handlers.Delete).Methods("DELETE")
+	r.HandleFunc("/user", handlers.List).Methods("GET")
 
 	fmt.Println("starting server at :8080")
 	http.ListenAndServe(":8080", r)
