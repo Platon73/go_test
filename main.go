@@ -34,7 +34,6 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	for rows.Next() {
 		post := &User{}
-		log.Println("Записи ", rows)
 		err = rows.Scan(&post.ID, &post.Firstname, &post.Lastname, &post.Email, &post.Age, &post.Created)
 		__err_panic(err)
 		users = append(users, post)
@@ -164,7 +163,15 @@ type Handler struct {
 
 func main() {
 
-	db, err := sql.Open("postgres", "postgres://userok:p@ssw0rd@localhost:5400/pogreb?sslmode=disable")
+	db, err := sql.Open("postgres", "postgres://postgres:postgres@go_db:5432/postgres?sslmode=disable")
+
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS \"users\" (" +
+		"                                      id SERIAL PRIMARY KEY," +
+		"                                   firstname VARCHAR(50) NOT NULL," +
+		"    lastname VARCHAR(50) NOT NULL," +
+		"    email VARCHAR(100) NOT NULL UNIQUE," +
+		"   age INTEGER CHECK (age >= 0)," +
+		"    created TIMESTAMP DEFAULT CURRENT_TIMESTAMP);")
 
 	if err != nil {
 		fmt.Println("db.Prepare failed:", err)
@@ -201,8 +208,8 @@ func main() {
 	r.HandleFunc("/user/update", handlers.Update).Methods("PATCH")
 	r.HandleFunc("/user/delete", handlers.Delete).Methods("DELETE")
 
-	fmt.Println("starting server at :8080")
-	http.ListenAndServe(":8080", r)
+	fmt.Println("starting server at :8000")
+	http.ListenAndServe(":8000", r)
 }
 
 // не используйте такой код в прошакшене
